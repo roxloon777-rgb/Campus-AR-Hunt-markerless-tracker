@@ -9,113 +9,165 @@
       padding: 0;
       height: 100%;
       font-family: sans-serif;
-      background-color: #000;
+      background: #f0f0f0;
       overflow: hidden;
     }
 
-    #map {
+    #mapContainer {
       position: relative;
-      width: 100vw;
+      width: 100%;
       height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
+      overflow: hidden;
     }
 
-    #map img {
-      max-width: 100%;
-      max-height: 100%;
-      height: auto;
+    #mapImage {
       width: auto;
+      height: 100%;
+      max-width: 100%;
       display: block;
     }
 
     .hotspot {
       position: absolute;
-      background: rgba(109, 62, 146, 0.8);
+      background: rgba(255, 0, 0, 0.8);
       color: white;
-      padding: 6px 12px;
-      border-radius: 8px;
+      padding: 6px 10px;
+      border-radius: 5px;
       cursor: pointer;
       font-weight: bold;
       transform: translate(-50%, -50%);
-      transition: transform 0.3s ease;
-    }
-
-    .hotspot:hover {
-      transform: translate(-50%, -50%) scale(1.1);
+      white-space: nowrap;
+      font-size: 14px;
     }
 
     .collected {
       background: rgba(0, 200, 0, 0.8);
     }
+
+    #userDot {
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: rgba(0, 150, 255, 0.9);
+      border: 2px solid white;
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+
+    #directionArrow {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-left: 10px solid transparent;
+      border-right: 10px solid transparent;
+      border-bottom: 20px solid rgba(0, 150, 255, 0.9);
+      transform-origin: 50% 100%;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
 
-  <div id="map">
-    <img id="mapImage" src="assets/Map2.png" alt="Map">
-  </div>
+<div id="mapContainer">
+  <img id="mapImage" src="assets/Map2.png" alt="Map">
 
-  <script>
-    const hotspotData = [
-      { id: 'law', x: 1447, y: 593, label: 'Law Fountain' },
-      { id: 'lovers', x: 1883, y: 960, label: 'Lovers Lane' },
-      { id: 'tree', x: 1184, y: 1436, label: 'Tree' }
-    ];
+  <div class="hotspot" id="law">Law Fountain</div>
+  <div class="hotspot" id="lovers">Lovers Lane</div>
+  <div class="hotspot" id="tree">Tree</div>
 
-    const collected = JSON.parse(localStorage.getItem('collected') || '{}');
-    const map = document.getElementById('map');
-    const mapImage = document.getElementById('mapImage');
+  <div id="userDot"></div>
+  <div id="directionArrow"></div>
+</div>
 
-    // Once the image loads, we can scale the hotspots properly
-    mapImage.addEventListener('load', () => {
-      const imgWidth = mapImage.naturalWidth;
-      const imgHeight = mapImage.naturalHeight;
+<script>
+  const MAP_WIDTH = 3508;
+  const MAP_HEIGHT = 2481;
 
-      hotspotData.forEach(hs => {
-        const hotspot = document.createElement('div');
-        hotspot.classList.add('hotspot');
-        hotspot.id = hs.id;
-        hotspot.textContent = hs.label;
+  const gpsHotspots = [
+    { id: 'law', lat: -26.688733, lon: 27.091227, x: 1447, y: 593 },
+    { id: 'lovers', lat: -26.689555, lon: 27.092471, x: 1883, y: 960 },
+    { id: 'tree', lat: -26.688875, lon: 27.092535, x: 1184, y: 1436 }
+  ];
 
-        if (collected[hs.id]) hotspot.classList.add('collected');
+  const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+  const mapImage = document.getElementById('mapImage');
 
-        // Append hotspot
-        map.appendChild(hotspot);
+  // Get GPS bounds (min/max lat/lon)
+  const minLat = Math.min(...gpsHotspots.map(h => h.lat));
+  const maxLat = Math.max(...gpsHotspots.map(h => h.lat));
+  const minLon = Math.min(...gpsHotspots.map(h => h.lon));
+  const maxLon = Math.max(...gpsHotspots.map(h => h.lon));
 
-        // Position hotspot relative to actual image size
-        positionHotspot(hotspot, hs.x, hs.y, imgWidth, imgHeight);
-        hotspot.addEventListener('click', () => goToAR(hs.id));
-      });
+  function latLonToXY(lat, lon) {
+    const xRatio = (lon - minLon) / (maxLon - minLon);
+    const yRatio = (maxLat - lat) / (maxLat - minLat);
+    const x = gpsHotspots[0].x + xRatio * (gpsHotspots[1].x - gpsHotspots[0].x); // approximate mapping
+    const y = gpsHotspots[0].y + yRatio * (gpsHotspots[2].y - gpsHotspots[0].y);
+    return { x, y };
+  }
+
+  function positionHotspots() {
+    const rect = mapImage.getBoundingClientRect();
+    const scaleX = rect.width / MAP_WIDTH;
+    const scaleY = rect.height / MAP_HEIGHT;
+    const offsetX = rect.left;
+    const offsetY = rect.top;
+
+    gpsHotspots.forEach(h => {
+      const el = document.getElementById(h.id);
+      const x = offsetX + h.x * scaleX;
+      const y = offsetY + h.y * scaleY;
+      el.style.left = `${x}px`;
+      el.style.top = `${y}px`;
+      if (collected[h.id]) el.classList.add('collected');
+
+      // Add click to pass coordinates to AR
+      el.onclick = () => {
+        window.location.href = `ar.html?lat=${h.lat}&lon=${h.lon}&id=${h.id}`;
+      }
     });
+  }
 
-    function positionHotspot(el, x, y, imgWidth, imgHeight) {
-      const rect = mapImage.getBoundingClientRect();
-      const scaleX = rect.width / imgWidth;
-      const scaleY = rect.height / imgHeight;
+  function updateUserPosition(lat, lon) {
+    const rect = mapImage.getBoundingClientRect();
+    const scaleX = rect.width / MAP_WIDTH;
+    const scaleY = rect.height / MAP_HEIGHT;
+    const offsetX = rect.left;
+    const offsetY = rect.top;
 
-      const left = rect.left + x * scaleX;
-      const top = rect.top + y * scaleY;
+    const { x, y } = latLonToXY(lat, lon);
+    const px = offsetX + x * scaleX;
+    const py = offsetY + y * scaleY;
 
-      el.style.left = `${left}px`;
-      el.style.top = `${top}px`;
-    }
+    const dot = document.getElementById('userDot');
+    const arrow = document.getElementById('directionArrow');
+    dot.style.left = `${px}px`;
+    dot.style.top = `${py}px`;
+    arrow.style.left = `${px}px`;
+    arrow.style.top = `${py - 25}px`;
+  }
 
-    function goToAR(location) {
-      window.location.href = `ar.html?highlight=${location}`;
-    }
+  // Watch user's real GPS
+  if ("geolocation" in navigator) {
+    navigator.geolocation.watchPosition(
+      pos => {
+        const { latitude, longitude } = pos.coords;
+        updateUserPosition(latitude, longitude);
+      },
+      err => console.warn('GPS error:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+    );
+  } else {
+    alert("GPS not supported on this device.");
+  }
 
-    // Recalculate on resize
-    window.addEventListener('resize', () => {
-      const imgWidth = mapImage.naturalWidth;
-      const imgHeight = mapImage.naturalHeight;
-      hotspotData.forEach(hs => {
-        const el = document.getElementById(hs.id);
-        if (el) positionHotspot(el, hs.x, hs.y, imgWidth, imgHeight);
-      });
-    });
-  </script>
+  window.addEventListener('resize', positionHotspots);
+  mapImage.onload = positionHotspots;
+</script>
 
 </body>
 </html>
