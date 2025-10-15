@@ -1,0 +1,8 @@
+body { margin: 0; font-family: Inter, system-ui, sans-serif; color: #222; background: #fafafa; }
+.page { max-width: 980px; margin: 12px auto; padding: 8px; text-align: center; }
+.map-container { position: relative; display: inline-block; width: 92%; max-width: 900px; }
+.map-img { width: 100%; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.hotspot { position: absolute; transform: translate(-50%, -50%); background: #dc143c; color: white; border: 0; padding: 8px 12px; border-radius: 999px; font-weight: 700; cursor: pointer; }
+.hint { color: #555; }
+.foot { color: #666; font-size: 0.9rem; margin-top: 10px; }
+.bottom-note { position: absolute; left: 50%; transform: translateX(-50%); bottom: 8px; background: rgba(255,255,255,0.85); padding: 6px 10px; border-radius: 8px; font-size: 0.9rem; }

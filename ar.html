@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Campus Hunt AR</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- 8th Wall project script placeholder -->
+  <script src="https://apps.8thwall.com/xrweb?appKey=YOUR_8THWALL_PROJECT_KEY"></script>
+
+  <script src="//cdn.8thwall.com/web/aframe/aframe-v1.2.0.min.js"></script>
+  <script src="//cdn.8thwall.com/web/xrextras/xrextras.js"></script>
+  <script src="//cdn.8thwall.com/web/xrextras/xrextras-aframe.js"></script>
+
+  <script defer src="app.js"></script>
+  <link rel="stylesheet" href="style.css">
+
+  <style>
+    #controls { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 60; display:flex; gap:10px;}
+    #preview { position: absolute; top: 16px; right: 16px; width: 120px; border: 2px solid #333; border-radius: 8px; display:none; z-index:60; }
+  </style>
+</head>
+<body>
+  <a-scene id="ar-scene"
+           xrweb
+           xrextras-almost-there
+           xrextras-loading
+           xrextras-runtime-error
+           embedded
+           renderer="colorManagement: true">
+    <a-camera gps-camera rotation-reader></a-camera>
+
+    <a-entity id="lawObj" visible="false"></a-entity>
+    <a-entity id="loversObj" visible="false"></a-entity>
+    <a-entity id="treeObj" visible="false"></a-entity>
+  </a-scene>
+
+  <div id="controls">
+    <button id="snapBtn">📸 Take Selfie</button>
+    <button id="downloadBtn" disabled>⬇️ Download</button>
+    <button id="uploadBtn" disabled>⬆️ Open Padlet</button>
+  </div>
+
+  <img id="preview" alt="Selfie preview" />
+  <div class="bottom-note">Tip: Allow camera & location. Walk close to the real spot to see the model.</div>
+</body>
+</html>

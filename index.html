@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Campus Hunt Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <h1>Campus Hunt — Map</h1>
+    <p class="hint">Tap a hotspot to open the AR camera for that location.</p>
+
+    <div class="map-container">
+      <img src="assets/images/map.png" alt="Campus map" class="map-img" />
+
+      <button class="hotspot" style="top:40%; left:45%;" onclick="goToAR('law')">Law Fountain</button>
+      <button class="hotspot" style="top:42%; left:55%;" onclick="goToAR('lovers')">Lovers Lane</button>
+      <button class="hotspot" style="top:41%; left:60%;" onclick="goToAR('tree')">Tree</button>
+    </div>
+
+    <p class="foot">When you tap a hotspot the AR camera will open — allow camera & location permissions.</p>
+  </main>
+
+  <script>
+    function goToAR(location) {
+      window.location.href = 'ar.html?loc=' + encodeURIComponent(location);
+    }
+  </script>
+</body>
+</html>
