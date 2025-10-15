@@ -69,102 +69,171 @@
       transform-origin: 50% 100%;
       z-index: 10;
     }
+
+    /* Start overlay */
+    #startScreen {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #000000cc;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 1000;
+    }
+
+    #startScreen h1 {
+      color: white;
+      font-size: 2em;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    #startScreen button {
+      padding: 15px 30px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    #startScreen button:hover {
+      background: #0056b3;
+    }
   </style>
 </head>
 <body>
 
+<!-- Start overlay -->
+<div id="startScreen">
+  <h1>Ready to start the Campus AR Treasure Hunt?</h1>
+  <button id="startButton">Start</button>
+</div>
+
 <div id="mapContainer">
   <img id="mapImage" src="assets/Map2.png" alt="Map">
 
-  <div class="hotspot" id="law">Calvyn Fountain</div>
-  <div class="hotspot" id="lovers">Lover's Lane</div>
-  <div class="hotspot" id="tree">AcaciaTree</div>
+  <div class="hotspot" id="law">Law Fountain</div>
+  <div class="hotspot" id="lovers">Lovers Lane</div>
+  <div class="hotspot" id="tree">Tree</div>
 
   <div id="userDot"></div>
   <div id="directionArrow"></div>
 </div>
 
 <script>
-  const MAP_WIDTH = 3508;
-  const MAP_HEIGHT = 2481;
+const MAP_WIDTH = 3508;
+const MAP_HEIGHT = 2481;
 
-  const gpsHotspots = [
-    { id: 'law', lat: -26.688733, lon: 27.091227, x: 1384, y: 708 },
-    { id: 'lovers', lat: -26.689555, lon: 27.092471, x: 1888, y: 858 },
-    { id: 'tree', lat: -26.688875, lon: 27.092535, x: 1202, y: 1545 }
-  ];
+const gpsHotspots = [
+  { id: 'law', lat: -26.688733, lon: 27.091227, x: 1384, y: 708 },
+  { id: 'lovers', lat: -26.689555, lon: 27.092471, x: 1888, y: 858 },
+  { id: 'tree', lat: -26.688875, lon: 27.092535, x: 1202, y: 1545 }
+];
 
-  // Load collected status from localStorage
-  const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+// Load collected status from localStorage
+const collected = JSON.parse(localStorage.getItem('collected') || '{}');
 
-  const mapImage = document.getElementById('mapImage');
+const mapImage = document.getElementById('mapImage');
+const userDot = document.getElementById('userDot');
+const arrow = document.getElementById('directionArrow');
 
-  function positionHotspots() {
-    const rect = mapImage.getBoundingClientRect();
-    const scaleX = rect.width / MAP_WIDTH;
-    const scaleY = rect.height / MAP_HEIGHT;
-    const offsetX = rect.left;
-    const offsetY = rect.top;
+function positionHotspots() {
+  const rect = mapImage.getBoundingClientRect();
+  const scaleX = rect.width / MAP_WIDTH;
+  const scaleY = rect.height / MAP_HEIGHT;
+  const offsetX = rect.left;
+  const offsetY = rect.top;
 
-    gpsHotspots.forEach(h => {
-      const el = document.getElementById(h.id);
-      const x = offsetX + h.x * scaleX;
-      const y = offsetY + h.y * scaleY;
-      el.style.left = `${x}px`;
-      el.style.top = `${y}px`;
-      if (collected[h.id]) el.classList.add('collected');
+  gpsHotspots.forEach(h => {
+    const el = document.getElementById(h.id);
+    const x = offsetX + h.x * scaleX;
+    const y = offsetY + h.y * scaleY;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    if (collected[h.id]) el.classList.add('collected');
 
-      el.onclick = () => {
-        window.location.href = `ar.html?id=${h.id}&lat=${h.lat}&lon=${h.lon}`;
-      }
-    });
-  }
+    el.onclick = () => {
+      window.location.href = `ar.html?id=${h.id}&lat=${h.lat}&lon=${h.lon}`;
+    };
+  });
+}
 
-  function updateUserPosition(lat, lon) {
-    const rect = mapImage.getBoundingClientRect();
-    const scaleX = rect.width / MAP_WIDTH;
-    const scaleY = rect.height / MAP_HEIGHT;
-    const offsetX = rect.left;
-    const offsetY = rect.top;
+// Convert GPS lat/lon to map coordinates
+function gpsToMap(lat, lon) {
+  const rect = mapImage.getBoundingClientRect();
+  // Simple linear mapping based on the hotspot bounding box
+  const minLat = Math.min(...gpsHotspots.map(h => h.lat));
+  const maxLat = Math.max(...gpsHotspots.map(h => h.lat));
+  const minLon = Math.min(...gpsHotspots.map(h => h.lon));
+  const maxLon = Math.max(...gpsHotspots.map(h => h.lon));
 
-    // Convert GPS to map pixels
-    gpsHotspots.forEach(h => {
-      const distance = Math.sqrt((lat - h.lat)**2 + (lon - h.lon)**2);
-      if(distance < 0.00005) { // Rough small distance to mark collected
-        if(!collected[h.id]) {
+  const x = ((lon - minLon) / (maxLon - minLon)) * rect.width + rect.left;
+  const y = ((maxLat - lat) / (maxLat - minLat)) * rect.height + rect.top;
+  return { x, y };
+}
+
+// Update user dot and arrow
+function updateUser(lat, lon) {
+  const { x, y } = gpsToMap(lat, lon);
+  userDot.style.left = `${x}px`;
+  userDot.style.top = `${y}px`;
+
+  // Find nearest uncollected hotspot
+  const remaining = gpsHotspots.filter(h => !collected[h.id]);
+  if(remaining.length === 0) return; // All collected
+
+  let nearest = remaining[0];
+  let minDist = (lat - nearest.lat)**2 + (lon - nearest.lon)**2;
+  remaining.forEach(h => {
+    const d = (lat - h.lat)**2 + (lon - h.lon)**2;
+    if(d < minDist) { minDist = d; nearest = h; }
+  });
+
+  const target = gpsToMap(nearest.lat, nearest.lon);
+  const dx = target.x - x;
+  const dy = target.y - y;
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  arrow.style.left = `${x}px`;
+  arrow.style.top = `${y}px`;
+  arrow.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+}
+
+window.addEventListener('resize', positionHotspots);
+mapImage.onload = positionHotspots;
+positionHotspots();
+
+// GPS watch
+if ("geolocation" in navigator) {
+  navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      updateUser(latitude, longitude);
+
+      // Mark collected hotspots if close
+      gpsHotspots.forEach(h => {
+        const distance = Math.sqrt((latitude - h.lat)**2 + (longitude - h.lon)**2);
+        if(distance < 0.00005 && !collected[h.id]) {
           collected[h.id] = true;
           localStorage.setItem('collected', JSON.stringify(collected));
           document.getElementById(h.id).classList.add('collected');
         }
-      }
-    });
+      });
+    },
+    err => console.warn('GPS error:', err),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+  );
+}
 
-    // Update user dot
-    const firstHotspot = gpsHotspots[0]; // approximate conversion
-    const xRatio = (lon - firstHotspot.lon) / 0.001; // rough scale
-    const yRatio = (firstHotspot.lat - lat) / 0.001;
-    const dot = document.getElementById('userDot');
-    dot.style.left = `${dot.offsetLeft + xRatio*100}px`;
-    dot.style.top = `${dot.offsetTop + yRatio*100}px`;
-  }
-
-  // Watch user's GPS
-  if ("geolocation" in navigator) {
-    navigator.geolocation.watchPosition(
-      pos => {
-        const { latitude, longitude } = pos.coords;
-        updateUserPosition(latitude, longitude);
-      },
-      err => console.warn('GPS error:', err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
-    );
-  } else {
-    alert("GPS not supported on this device.");
-  }
-
-  window.addEventListener('resize', positionHotspots);
-  mapImage.onload = positionHotspots;
-  positionHotspots(); // initial positioning
+// Start overlay
+document.getElementById('startButton').addEventListener('click', () => {
+  document.getElementById('startScreen').style.display = 'none';
+});
 </script>
 
 </body>
