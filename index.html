@@ -41,6 +41,7 @@
       transform: translate(-50%, -50%);
       white-space: nowrap;
       font-size: 14px;
+      transition: background 0.3s;
     }
 
     .collected {
@@ -93,22 +94,10 @@
     { id: 'tree', lat: -26.688875, lon: 27.092535, x: 1184, y: 1436 }
   ];
 
+  // Load collected status from localStorage
   const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+
   const mapImage = document.getElementById('mapImage');
-
-  // Get GPS bounds (min/max lat/lon)
-  const minLat = Math.min(...gpsHotspots.map(h => h.lat));
-  const maxLat = Math.max(...gpsHotspots.map(h => h.lat));
-  const minLon = Math.min(...gpsHotspots.map(h => h.lon));
-  const maxLon = Math.max(...gpsHotspots.map(h => h.lon));
-
-  function latLonToXY(lat, lon) {
-    const xRatio = (lon - minLon) / (maxLon - minLon);
-    const yRatio = (maxLat - lat) / (maxLat - minLat);
-    const x = gpsHotspots[0].x + xRatio * (gpsHotspots[1].x - gpsHotspots[0].x); // approximate mapping
-    const y = gpsHotspots[0].y + yRatio * (gpsHotspots[2].y - gpsHotspots[0].y);
-    return { x, y };
-  }
 
   function positionHotspots() {
     const rect = mapImage.getBoundingClientRect();
@@ -125,9 +114,8 @@
       el.style.top = `${y}px`;
       if (collected[h.id]) el.classList.add('collected');
 
-      // Add click to pass coordinates to AR
       el.onclick = () => {
-        window.location.href = `ar.html?lat=${h.lat}&lon=${h.lon}&id=${h.id}`;
+        window.location.href = `ar.html?id=${h.id}&lat=${h.lat}&lon=${h.lon}`;
       }
     });
   }
@@ -139,19 +127,28 @@
     const offsetX = rect.left;
     const offsetY = rect.top;
 
-    const { x, y } = latLonToXY(lat, lon);
-    const px = offsetX + x * scaleX;
-    const py = offsetY + y * scaleY;
+    // Convert GPS to map pixels
+    gpsHotspots.forEach(h => {
+      const distance = Math.sqrt((lat - h.lat)**2 + (lon - h.lon)**2);
+      if(distance < 0.00005) { // Rough small distance to mark collected
+        if(!collected[h.id]) {
+          collected[h.id] = true;
+          localStorage.setItem('collected', JSON.stringify(collected));
+          document.getElementById(h.id).classList.add('collected');
+        }
+      }
+    });
 
+    // Update user dot
+    const firstHotspot = gpsHotspots[0]; // approximate conversion
+    const xRatio = (lon - firstHotspot.lon) / 0.001; // rough scale
+    const yRatio = (firstHotspot.lat - lat) / 0.001;
     const dot = document.getElementById('userDot');
-    const arrow = document.getElementById('directionArrow');
-    dot.style.left = `${px}px`;
-    dot.style.top = `${py}px`;
-    arrow.style.left = `${px}px`;
-    arrow.style.top = `${py - 25}px`;
+    dot.style.left = `${dot.offsetLeft + xRatio*100}px`;
+    dot.style.top = `${dot.offsetTop + yRatio*100}px`;
   }
 
-  // Watch user's real GPS
+  // Watch user's GPS
   if ("geolocation" in navigator) {
     navigator.geolocation.watchPosition(
       pos => {
@@ -167,6 +164,7 @@
 
   window.addEventListener('resize', positionHotspots);
   mapImage.onload = positionHotspots;
+  positionHotspots(); // initial positioning
 </script>
 
 </body>
