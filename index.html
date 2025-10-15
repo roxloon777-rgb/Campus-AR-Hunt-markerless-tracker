@@ -4,53 +4,48 @@
   <meta charset="UTF-8">
   <title>AR Treasure Hunt Map</title>
   <style>
-    /* General layout */
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
       font-family: sans-serif;
-      background-color: #000; /* fills any empty space */
+      background-color: #000;
+      overflow: hidden;
     }
 
-    /* Map container */
     #map {
       position: relative;
       width: 100vw;
       height: 100vh;
-      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
 
-    /* Map image — centered and scaled properly */
     #map img {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      max-width: 100%;
+      max-height: 100%;
+      height: auto;
       width: auto;
-      height: 100%;
-      object-fit: contain;
+      display: block;
     }
 
-    /* Hotspot buttons */
     .hotspot {
       position: absolute;
-      background: rgba(255, 0, 0, 0.8);
+      background: rgba(109, 62, 146, 0.8);
       color: white;
       padding: 6px 12px;
       border-radius: 8px;
       cursor: pointer;
-      transform: translate(-50%, -50%);
       font-weight: bold;
-      transition: all 0.3s ease;
+      transform: translate(-50%, -50%);
+      transition: transform 0.3s ease;
     }
 
     .hotspot:hover {
-      background: rgba(255, 80, 80, 0.9);
       transform: translate(-50%, -50%) scale(1.1);
     }
 
-    /* Green for collected */
     .collected {
       background: rgba(0, 200, 0, 0.8);
     }
@@ -59,30 +54,68 @@
 <body>
 
   <div id="map">
-    <img src="assets/Map2.png" alt="Map">
-
-    <!-- Hotspots positioned by percentage (adjust if needed) -->
-    <div class="hotspot" id="law" style="top:10%; left:50%;" onclick="goToAR('law')">Law Fountain</div>
-    <div class="hotspot" id="lovers" style="top:50%; left:60%;" onclick="goToAR('lovers')">Lovers Lane</div>
-    <div class="hotspot" id="tree" style="top:70%; left:40%;" onclick="goToAR('tree')">Tree</div>
+    <img id="mapImage" src="assets/Map2.png" alt="Map">
   </div>
 
   <script>
-    // Retrieve collected hotspots from localStorage
-    const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+    const hotspotData = [
+      { id: 'law', x: 1447, y: 593, label: 'Law Fountain' },
+      { id: 'lovers', x: 1883, y: 960, label: 'Lovers Lane' },
+      { id: 'tree', x: 1184, y: 1436, label: 'Tree' }
+    ];
 
-    ['law','lovers','tree'].forEach(id => {
-      if (collected[id]) {
-        document.getElementById(id).classList.add('collected');
-      }
+    const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+    const map = document.getElementById('map');
+    const mapImage = document.getElementById('mapImage');
+
+    // Once the image loads, we can scale the hotspots properly
+    mapImage.addEventListener('load', () => {
+      const imgWidth = mapImage.naturalWidth;
+      const imgHeight = mapImage.naturalHeight;
+
+      hotspotData.forEach(hs => {
+        const hotspot = document.createElement('div');
+        hotspot.classList.add('hotspot');
+        hotspot.id = hs.id;
+        hotspot.textContent = hs.label;
+
+        if (collected[hs.id]) hotspot.classList.add('collected');
+
+        // Append hotspot
+        map.appendChild(hotspot);
+
+        // Position hotspot relative to actual image size
+        positionHotspot(hotspot, hs.x, hs.y, imgWidth, imgHeight);
+        hotspot.addEventListener('click', () => goToAR(hs.id));
+      });
     });
 
+    function positionHotspot(el, x, y, imgWidth, imgHeight) {
+      const rect = mapImage.getBoundingClientRect();
+      const scaleX = rect.width / imgWidth;
+      const scaleY = rect.height / imgHeight;
+
+      const left = rect.left + x * scaleX;
+      const top = rect.top + y * scaleY;
+
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+    }
+
     function goToAR(location) {
-      // Redirect to AR scene and pass location as a query
       window.location.href = `ar.html?highlight=${location}`;
     }
+
+    // Recalculate on resize
+    window.addEventListener('resize', () => {
+      const imgWidth = mapImage.naturalWidth;
+      const imgHeight = mapImage.naturalHeight;
+      hotspotData.forEach(hs => {
+        const el = document.getElementById(hs.id);
+        if (el) positionHotspot(el, hs.x, hs.y, imgWidth, imgHeight);
+      });
+    });
   </script>
 
 </body>
 </html>
-
