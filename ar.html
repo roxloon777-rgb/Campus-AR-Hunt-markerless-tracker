@@ -1,47 +1,133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Campus Hunt AR</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- 8th Wall project script placeholder -->
-  <script src="https://apps.8thwall.com/xrweb?appKey=YOUR_8THWALL_PROJECT_KEY"></script>
-
-  <script src="//cdn.8thwall.com/web/aframe/aframe-v1.2.0.min.js"></script>
-  <script src="//cdn.8thwall.com/web/xrextras/xrextras.js"></script>
-  <script src="//cdn.8thwall.com/web/xrextras/xrextras-aframe.js"></script>
-
-  <script defer src="app.js"></script>
-  <link rel="stylesheet" href="style.css">
-
+  <meta charset="UTF-8">
+  <title>AR Treasure Hunt</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
   <style>
-    #controls { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 60; display:flex; gap:10px;}
-    #preview { position: absolute; top: 16px; right: 16px; width: 120px; border: 2px solid #333; border-radius: 8px; display:none; z-index:60; }
+    body { margin: 0; overflow: hidden; }
+    button {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+    #takeSelfie { bottom: 20px; }
+    #uploadPadlet { bottom: 70px; display:none; }
   </style>
 </head>
 <body>
-  <a-scene id="ar-scene"
-           xrweb
-           xrextras-almost-there
-           xrextras-loading
-           xrextras-runtime-error
-           embedded
-           renderer="colorManagement: true">
-    <a-camera gps-camera rotation-reader></a-camera>
 
-    <a-entity id="lawObj" visible="false"></a-entity>
-    <a-entity id="loversObj" visible="false"></a-entity>
-    <a-entity id="treeObj" visible="false"></a-entity>
-  </a-scene>
+<a-scene
+  vr-mode-ui="enabled: false"
+  embedded
+  arjs="sourceType: webcam; debugUIEnabled: false;"
+  renderer="antialias: true; alpha: true; physicallyCorrectLights: true"
+>
+  <a-entity light="type: ambient; color: #ffffff; intensity: 0.6"></a-entity>
+  <a-entity light="type: directional; intensity: 0.8" position="1 3 2"></a-entity>
 
-  <div id="controls">
-    <button id="snapBtn">📸 Take Selfie</button>
-    <button id="downloadBtn" disabled>⬇️ Download</button>
-    <button id="uploadBtn" disabled>⬆️ Open Padlet</button>
-  </div>
+  <a-camera id="camera" position="0 1.6 0"></a-camera>
+</a-scene>
 
-  <img id="preview" alt="Selfie preview" />
-  <div class="bottom-note">Tip: Allow camera & location. Walk close to the real spot to see the model.</div>
+<button id="takeSelfie">Take Selfie</button>
+<button id="uploadPadlet">Upload to Padlet</button>
+
+<script>
+  // Treasure hunt locations
+  const objects = [
+    {id:'law', lat: -26.688733, lon: 27.091227, model:"models/meet_mira.glb"},
+    {id:'lovers', lat: -26.689555, lon: 27.092471, model:"models/meet_mira.glb"},
+    {id:'tree', lat: -26.688875, lon: 27.092535, model:"models/meet_mira.glb"}
+  ];
+
+  const SHOW_DISTANCE = 2; // meters
+  const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+  let lastSelfieData = null;
+  let lastCollectedObject = null;
+
+  function getDistance(lat1, lon1, lat2, lon2) {
+    function toRad(x) { return x * Math.PI / 180; }
+    const R = 6371e3;
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lon2 - lon1);
+    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // Watch GPS
+  navigator.geolocation.watchPosition(pos => {
+    const userLat = pos.coords.latitude;
+    const userLon = pos.coords.longitude;
+
+    objects.forEach(obj => {
+      const distance = getDistance(userLat, userLon, obj.lat, obj.lon);
+
+      if(distance <= SHOW_DISTANCE && !collected[obj.id]) {
+        // Mark as collected
+        collected[obj.id] = true;
+        localStorage.setItem('collected', JSON.stringify(collected));
+        alert(`You have collected: ${obj.id.toUpperCase()}!`);
+
+        // Spawn the model + ground plane in front of the user
+        const scene = document.querySelector('a-scene');
+
+        const container = document.createElement('a-entity');
+        container.setAttribute('position', '0 0 -3'); // 3m in front of user
+
+        // 3D model
+        const model = document.createElement('a-entity');
+        model.setAttribute('gltf-model', obj.model);
+        model.setAttribute('scale', '1 1 1'); // safe size
+        model.setAttribute('rotation', '0 180 0');
+        container.appendChild(model);
+
+        // Ground circle / shadow
+        const ground = document.createElement('a-circle');
+        ground.setAttribute('radius', '1.2');
+        ground.setAttribute('rotation', '-90 0 0');
+        ground.setAttribute('position', '0 0 0');
+        ground.setAttribute('material', 'color: #000000; opacity: 0.25; side: double');
+        container.appendChild(ground);
+
+        scene.appendChild(container);
+
+        lastCollectedObject = obj.id;
+      }
+    });
+  }, err => console.error(err), { enableHighAccuracy: true });
+
+  // Take selfie
+  document.getElementById('takeSelfie').addEventListener('click', () => {
+    if(!lastCollectedObject) {
+      alert('Move closer to an object to take a selfie!');
+      return;
+    }
+    const scene = document.querySelector('a-scene');
+    scene.components.screenshot.capture('perspective', (dataUri) => {
+      lastSelfieData = dataUri;
+      document.getElementById('uploadPadlet').style.display = 'block';
+      window.open(dataUri); // open selfie in new tab
+    });
+  });
+
+  // Upload to Padlet
+  document.getElementById('uploadPadlet').addEventListener('click', () => {
+    if(!lastSelfieData) {
+      alert('Take a selfie first!');
+      return;
+    }
+    window.open('https://padlet.com/roxloon777/campus-hunt-wall-of-fame-gkek97r08b9p9047', '_blank');
+    alert('Drag your selfie from the opened tab onto the Padlet wall.');
+  });
+</script>
+
 </body>
 </html>
