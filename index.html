@@ -2,17 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AR Treasure Hunt Map (Live Test)</title>
+  <title>AR Treasure Hunt Map</title>
   <style>
     body, html {
-      margin: 0; padding: 0; height: 100%;
+      margin: 0;
+      padding: 0;
+      height: 100%;
       font-family: sans-serif;
+      background: #f3f3f3;
+      overflow: hidden;
     }
+
     #map {
+      width: 100%;
+      height: 90vh;
       position: relative;
-      width: 100%; height: 100vh;
-      background: url('assets/Map.png') center/cover no-repeat;
+      overflow: hidden;
     }
+
+    #map img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
     .hotspot {
       position: absolute;
       background: rgba(255, 0, 0, 0.8);
@@ -22,82 +35,174 @@
       cursor: pointer;
       transform: translate(-50%, -50%);
       font-weight: bold;
+      display: flex;
+      align-items: center;
+      z-index: 10;
     }
+
     .collected {
       background: rgba(0, 200, 0, 0.8);
     }
-    #user {
-      position: absolute;
-      width: 20px; height: 20px;
-      background: blue;
+
+    .hotspot img {
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      transform: translate(-50%, -50%);
+      object-fit: cover;
+      margin-left: 8px;
       border: 2px solid white;
+      box-shadow: 0 0 8px rgba(255,255,255,0.6);
+      transition: transform 0.3s ease;
+    }
+
+    .hotspot:hover img {
+      transform: scale(1.2);
+    }
+
+    #you {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: rgba(0, 0, 255, 0.8);
+      border-radius: 50%;
+      border: 2px solid white;
+      transform: translate(-50%, -50%);
+      z-index: 50;
+    }
+
+    #arrow {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) rotate(0deg);
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-bottom: 25px solid orange;
+      z-index: 1000;
     }
   </style>
 </head>
 <body>
 
 <div id="map">
+  <img src="assets/Map.png" alt="Map">
+
   <div class="hotspot" id="law" style="top:40%; left:30%;" onclick="goToAR('law')">Law Fountain</div>
   <div class="hotspot" id="lovers" style="top:50%; left:45%;" onclick="goToAR('lovers')">Lovers Lane</div>
   <div class="hotspot" id="tree" style="top:50%; left:60%;" onclick="goToAR('tree')">Tree</div>
-  <div id="user"></div>
 </div>
 
+<div id="arrow"></div>
+
 <script>
-const map = document.getElementById('map');
-const userMarker = document.getElementById('user');
+  // === Data for each AR object ===
+  const objects = [
+    {id:'law', lat: -26.688733, lon: 27.091227},
+    {id:'lovers', lat: -26.689555, lon: 27.092471},
+    {id:'tree', lat: -26.688875, lon: 27.092535}
+  ];
 
-// Fake map center = your coordinate
-const mapCenter = { lat: -26.727530676958416, lon: 27.115707198866335 };
+  // Load collected status & selfies
+  const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+  const selfies = JSON.parse(localStorage.getItem('selfies') || '{}');
 
-// Fake hotspots near your coordinate
-const hotspots = {
-  law: { lat: -26.7270, lon: 27.1150 },
-  lovers: { lat: -26.7280, lon: 27.1160 },
-  tree: { lat: -26.7273, lon: 27.1170 }
-};
+  // Add selfies or badges to hotspots
+  ['law','lovers','tree'].forEach(id => {
+    const el = document.getElementById(id);
 
-// Convert lat/lon difference into % on the map
-function positionOnMap(lat, lon) {
-  const latDiff = (lat - mapCenter.lat) * 10000; // scale for visible spacing
-  const lonDiff = (lon - mapCenter.lon) * 10000;
-  const top = 50 - latDiff;
-  const left = 50 + lonDiff;
-  return { top, left };
-}
+    if(collected[id]) {
+      el.classList.add('collected');
+    }
 
-// Set hotspot positions
-for (const id in hotspots) {
-  const pos = positionOnMap(hotspots[id].lat, hotspots[id].lon);
-  const el = document.getElementById(id);
-  el.style.top = `${pos.top}%`;
-  el.style.left = `${pos.left}%`;
-}
+    const thumb = document.createElement('img');
+    thumb.src = selfies[id] || 'assets/badge.png';
+    thumb.title = selfies[id] ? 'View Selfie' : 'Not collected yet';
+    el.appendChild(thumb);
 
-// Live GPS tracking
-if (navigator.geolocation) {
+    // Optional: make thumbnail clickable
+    if(selfies[id]) {
+      thumb.style.cursor = 'pointer';
+      thumb.addEventListener('click', (e) => {
+        e.stopPropagation();
+        window.open(selfies[id], '_blank');
+      });
+    }
+  });
+
+  // === Navigation to AR Scene ===
+  function goToAR(location) {
+    window.location.href = `ar.html?highlight=${location}`;
+  }
+
+  // === Create "You are here" dot ===
+  const you = document.createElement('div');
+  you.id = 'you';
+  document.getElementById('map').appendChild(you);
+
+  // === Approximate GPS boundaries for your map image ===
+  // Adjust these for accuracy to your campus map
+  const mapBounds = {
+    topLat: -26.688500,    // top edge latitude
+    bottomLat: -26.690000, // bottom edge latitude
+    leftLon: 27.090000,    // left edge longitude
+    rightLon: 27.093000    // right edge longitude
+  };
+
+  // === Distance calculator ===
+  function getDistance(lat1, lon1, lat2, lon2) {
+    function toRad(x) { return x * Math.PI / 180; }
+    const R = 6371e3;
+    const φ1 = toRad(lat1);
+    const φ2 = toRad(lat2);
+    const Δφ = toRad(lat2 - lat1);
+    const Δλ = toRad(lon2 - lon1);
+    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // === Bearing calculator for arrow ===
+  function getBearing(lat1, lon1, lat2, lon2) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+    const y = Math.sin(toRad(lon2 - lon1)) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1))*Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1))*Math.cos(toRad(lat2))*Math.cos(toRad(lon2 - lon1));
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  // === Live GPS tracking ===
   navigator.geolocation.watchPosition(pos => {
     const { latitude, longitude } = pos.coords;
-    const userPos = positionOnMap(latitude, longitude);
-    userMarker.style.top = `${userPos.top}%`;
-    userMarker.style.left = `${userPos.left}%`;
-  }, err => {
-    console.warn('GPS error:', err);
-    alert('Unable to access location. Please allow GPS permissions.');
-  }, { enableHighAccuracy: true });
-}
+    const map = document.getElementById('map');
+    const mapWidth = map.clientWidth;
+    const mapHeight = map.clientHeight;
 
-// Keep your collected system
-const collected = JSON.parse(localStorage.getItem('collected') || '{}');
-['law','lovers','tree'].forEach(id => {
-  if(collected[id]) document.getElementById(id).classList.add('collected');
-});
+    // Convert GPS to relative position on map
+    const x = ((longitude - mapBounds.leftLon) / (mapBounds.rightLon - mapBounds.leftLon)) * 100;
+    const y = ((mapBounds.topLat - latitude) / (mapBounds.topLat - mapBounds.bottomLat)) * 100;
 
-function goToAR(location) {
-  window.location.href = `ar.html?highlight=${location}`;
-}
+    you.style.left = `${x}%`;
+    you.style.top = `${y}%`;
+
+    // Find nearest uncollected hotspot
+    const uncollected = objects.filter(o => !collected[o.id]);
+    if (uncollected.length === 0) return;
+
+    const nearest = uncollected.reduce((closest, obj) => {
+      const dist = getDistance(latitude, longitude, obj.lat, obj.lon);
+      return (!closest || dist < closest.dist) ? { ...obj, dist } : closest;
+    }, null);
+
+    // Rotate arrow toward nearest hotspot
+    const bearing = getBearing(latitude, longitude, nearest.lat, nearest.lon);
+    const arrow = document.getElementById('arrow');
+    arrow.style.transform = `translateX(-50%) rotate(${bearing}deg)`;
+
+  }, err => console.error(err), { enableHighAccuracy: true });
 </script>
+
 </body>
 </html>
