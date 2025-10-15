@@ -30,7 +30,6 @@
 >
   <a-entity light="type: ambient; color: #ffffff; intensity: 0.6"></a-entity>
   <a-entity light="type: directional; intensity: 0.8" position="1 3 2"></a-entity>
-
   <a-camera id="camera" position="0 1.6 0"></a-camera>
 </a-scene>
 
@@ -38,17 +37,17 @@
 <button id="uploadPadlet">Upload to Padlet</button>
 
 <script>
-  // Treasure hunt locations
-  const objects = [
-    {id:'law', lat: -26.688733, lon: 27.091227, model:"models/meet_mira.glb"},
-    {id:'lovers', lat: -26.689555, lon: 27.092471, model:"models/meet_mira.glb"},
-    {id:'tree', lat: -26.688875, lon: 27.092535, model:"models/meet_mira.glb"}
-  ];
-
   const SHOW_DISTANCE = 2; // meters
   const collected = JSON.parse(localStorage.getItem('collected') || '{}');
   let lastSelfieData = null;
   let lastCollectedObject = null;
+
+  // All hotspots with their own models
+  const objects = [
+    { id:'law', lat: -26.688733, lon: 27.091227, model:"models/law_model.glb" },
+    { id:'lovers', lat: -26.689555, lon: 27.092471, model:"models/lovers_model.glb" },
+    { id:'tree', lat: -26.688875, lon: 27.092535, model:"models/tree_model.glb" }
+  ];
 
   function getDistance(lat1, lon1, lat2, lon2) {
     function toRad(x) { return x * Math.PI / 180; }
@@ -62,7 +61,7 @@
     return R * c;
   }
 
-  // Watch GPS
+  // Watch GPS and spawn models independently
   navigator.geolocation.watchPosition(pos => {
     const userLat = pos.coords.latitude;
     const userLon = pos.coords.longitude;
@@ -71,12 +70,10 @@
       const distance = getDistance(userLat, userLon, obj.lat, obj.lon);
 
       if(distance <= SHOW_DISTANCE && !collected[obj.id]) {
-        // Mark as collected
         collected[obj.id] = true;
         localStorage.setItem('collected', JSON.stringify(collected));
         alert(`You have collected: ${obj.id.toUpperCase()}!`);
 
-        // Spawn the model + ground plane in front of the user
         const scene = document.querySelector('a-scene');
 
         const container = document.createElement('a-entity');
@@ -85,7 +82,7 @@
         // 3D model
         const model = document.createElement('a-entity');
         model.setAttribute('gltf-model', obj.model);
-        model.setAttribute('scale', '1 1 1'); // safe size
+        model.setAttribute('scale', '1 1 1');
         model.setAttribute('rotation', '0 180 0');
         container.appendChild(model);
 
