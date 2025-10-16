@@ -70,6 +70,19 @@
       z-index: 10;
     }
 
+    #nearbyHint {
+      position: absolute;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 20;
+      transform: translate(-50%, -150%);
+      display: none;
+    }
+
     /* Start overlay */
     #startScreen {
       position: fixed;
@@ -81,13 +94,15 @@
       align-items: center;
       flex-direction: column;
       z-index: 1000;
+      text-align: center;
+      padding: 20px;
+      box-sizing: border-box;
     }
 
     #startScreen h1 {
       color: white;
-      font-size: 2em;
+      font-size: 1.8em;
       margin-bottom: 20px;
-      text-align: center;
     }
 
     #startScreen button {
@@ -110,8 +125,12 @@
 
 <!-- Start overlay -->
 <div id="startScreen">
-  <h1>Welcome to our creative photo challenge! For the best results, turn your screen to landscape. Your mission: explore, capture, and share the spirit of our campus through three special locations. Find each place, follow the creative clue, take a photo, and post it right here on Padlet!
-</h1>
+  <h1>
+    Padlet Scavenger Hunt: Through Our Campus Lens<br><br>
+    Welcome to our creative photo challenge! For best results turn your screen to landscape! 📸✨<br>
+    Your mission: explore, capture, and share the spirit of our campus through three special locations.<br>
+    Find each place, take a photo, and post it on Padlet!
+  </h1>
   <button id="startButton">Start</button>
 </div>
 
@@ -124,6 +143,7 @@
 
   <div id="userDot"></div>
   <div id="directionArrow"></div>
+  <div id="nearbyHint"></div>
 </div>
 
 <script>
@@ -131,17 +151,17 @@ const MAP_WIDTH = 3508;
 const MAP_HEIGHT = 2481;
 
 const gpsHotspots = [
-  { id: 'law', lat: -26.688733, lon: 27.091227, x: 1384, y: 708 },
-  { id: 'lovers', lat: -26.689555, lon: 27.092471, x: 1888, y: 858 },
-  { id: 'tree', lat: -26.688875, lon: 27.092535, x: 1202, y: 1545 }
+  { id: 'law', lat: -26.688737, lon: 27.091276, x: 1384, y: 708 },
+  { id: 'lovers', lat: -26.688676, lon: 27.092549, x: 1888, y: 858 },
+  { id: 'tree', lat: -26.688878, lon: 27.092565, x: 1202, y: 1545 }
 ];
 
-// Load collected status from localStorage
 const collected = JSON.parse(localStorage.getItem('collected') || '{}');
 
 const mapImage = document.getElementById('mapImage');
 const userDot = document.getElementById('userDot');
 const arrow = document.getElementById('directionArrow');
+const nearbyHint = document.getElementById('nearbyHint');
 
 function positionHotspots() {
   const rect = mapImage.getBoundingClientRect();
@@ -159,15 +179,13 @@ function positionHotspots() {
     if (collected[h.id]) el.classList.add('collected');
 
     el.onclick = () => {
-      window.location.href = `ar.html?id=${h.id}&lat=${h.lat}&lon=${h.lon}`;
+      window.location.href = `ar.html?id=${h.id}&lat=${h.lat}&lon=${h.lon}&padlet=https://padlet.com/nwu/desmond-tutu-school-of-medicine-kcvop1gmdyzyntoq`;
     };
   });
 }
 
-// Convert GPS lat/lon to map coordinates
 function gpsToMap(lat, lon) {
   const rect = mapImage.getBoundingClientRect();
-  // Simple linear mapping based on the hotspot bounding box
   const minLat = Math.min(...gpsHotspots.map(h => h.lat));
   const maxLat = Math.max(...gpsHotspots.map(h => h.lat));
   const minLon = Math.min(...gpsHotspots.map(h => h.lon));
@@ -178,48 +196,54 @@ function gpsToMap(lat, lon) {
   return { x, y };
 }
 
-// Update user dot and arrow
 function updateUser(lat, lon) {
   const { x, y } = gpsToMap(lat, lon);
   userDot.style.left = `${x}px`;
   userDot.style.top = `${y}px`;
 
-  // Find nearest uncollected hotspot
   const remaining = gpsHotspots.filter(h => !collected[h.id]);
-  if(remaining.length === 0) return; // All collected
+  if (remaining.length === 0) {
+    nearbyHint.style.display = 'none';
+    return;
+  }
 
+  // Nearest hotspot
   let nearest = remaining[0];
   let minDist = (lat - nearest.lat)**2 + (lon - nearest.lon)**2;
   remaining.forEach(h => {
     const d = (lat - h.lat)**2 + (lon - h.lon)**2;
-    if(d < minDist) { minDist = d; nearest = h; }
+    if (d < minDist) { minDist = d; nearest = h; }
   });
 
+  // Update arrow
   const target = gpsToMap(nearest.lat, nearest.lon);
   const dx = target.x - x;
   const dy = target.y - y;
   const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-
   arrow.style.left = `${x}px`;
   arrow.style.top = `${y}px`;
   arrow.style.transform = `translate(-50%, -100%) rotate(${angle}deg)`;
+
+  // Show nearby hint
+  nearbyHint.style.display = 'block';
+  nearbyHint.style.left = `${x}px`;
+  nearbyHint.style.top = `${y}px`;
+  nearbyHint.textContent = `Nearest: ${nearest.id.replace(/^\w/, c => c.toUpperCase())}`;
 }
 
 window.addEventListener('resize', positionHotspots);
 mapImage.onload = positionHotspots;
 positionHotspots();
 
-// GPS watch
 if ("geolocation" in navigator) {
   navigator.geolocation.watchPosition(
     pos => {
       const { latitude, longitude } = pos.coords;
       updateUser(latitude, longitude);
 
-      // Mark collected hotspots if close
       gpsHotspots.forEach(h => {
         const distance = Math.sqrt((latitude - h.lat)**2 + (longitude - h.lon)**2);
-        if(distance < 0.00005 && !collected[h.id]) {
+        if (distance < 0.00005 && !collected[h.id]) {
           collected[h.id] = true;
           localStorage.setItem('collected', JSON.stringify(collected));
           document.getElementById(h.id).classList.add('collected');
@@ -231,7 +255,6 @@ if ("geolocation" in navigator) {
   );
 }
 
-// Start overlay
 document.getElementById('startButton').addEventListener('click', () => {
   document.getElementById('startScreen').style.display = 'none';
 });
@@ -239,3 +262,4 @@ document.getElementById('startButton').addEventListener('click', () => {
 
 </body>
 </html>
+
