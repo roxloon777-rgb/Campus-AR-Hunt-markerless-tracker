@@ -21,9 +21,24 @@
     #takeSelfie { bottom: 20px; }
     #uploadPadlet { bottom: 70px; display:none; }
     #backToMap { bottom: 120px; display:block; background: #444; color: white; }
+    #nearbyNotice {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 16px;
+      display: none;
+      z-index: 1000;
+    }
   </style>
 </head>
 <body>
+
+<div id="nearbyNotice"></div>
 
 <a-scene
   vr-mode-ui="enabled: false"
@@ -43,15 +58,17 @@
 
 <script>
   const objects = [
-    {id:'law', lat: -26.688737, lon: 27.091276, model:"models/free_pack_-_human_skeleton.glb", message:"🎉 Well done! You found the Calvyn Fountain by Law."},
-    {id:'lovers', lat: -26.688676, lon: 27.092549, model:"models/free_pack_-_human_skeleton.glb", message:"💞 Well done! You found our Lover’s Lane."},
-    {id:'tree', lat:-26.688878, lon: 27.092565, model:"models/free_pack_-_human_skeleton.glb", message:"🌳 Well done! You found the Acacia Tree."}
+    {id:'law', lat: -26.688737, lon: 27.091276, model:"models/meet_mira.glb", message:"🎉 Well done! You found the Calvyn Fountain by Law."},
+    {id:'lovers', lat: -26.688676, lon: 27.092549, model:"models/meet_mira.glb", message:"💞 Well done! You found our Lover’s Lane."},
+    {id:'tree', lat: -26.688878, lon: 27.092565, model:"models/meet_mira.glb", message:"🌳 Well done! You found the Acacia Tree."}
   ];
 
-  const SHOW_DISTANCE = 2; // meters
+  const SHOW_DISTANCE = 10; // meters
   const collected = JSON.parse(localStorage.getItem('collected') || '{}');
   let lastSelfieData = null;
   let lastCollectedObject = null;
+
+  const nearbyNotice = document.getElementById('nearbyNotice');
 
   function getDistance(lat1, lon1, lat2, lon2) {
     function toRad(x) { return x * Math.PI / 180; }
@@ -65,13 +82,19 @@
     return R * c;
   }
 
-  // Watch GPS
   navigator.geolocation.watchPosition(pos => {
     const userLat = pos.coords.latitude;
     const userLon = pos.coords.longitude;
 
     objects.forEach(obj => {
       const distance = getDistance(userLat, userLon, obj.lat, obj.lon);
+
+      // Show nearby notice if within 20m
+      if(distance <= 20 && !collected[obj.id]) {
+        nearbyNotice.style.display = 'block';
+        nearbyNotice.textContent = `You're near the ${obj.id}! Look around for your AR model.`;
+        setTimeout(()=> { nearbyNotice.style.display='none'; }, 4000);
+      }
 
       if(distance <= SHOW_DISTANCE && !collected[obj.id]) {
         collected[obj.id] = true;
@@ -80,7 +103,7 @@
 
         const scene = document.querySelector('a-scene');
         const container = document.createElement('a-entity');
-        container.setAttribute('position', '0 0 -3'); // 3m in front of user
+        container.setAttribute('position', '0 0 -3');
 
         // 3D model
         const model = document.createElement('a-entity');
@@ -89,7 +112,7 @@
         model.setAttribute('rotation', '0 180 0');
         container.appendChild(model);
 
-        // Ground circle / shadow
+        // Ground circle
         const ground = document.createElement('a-circle');
         ground.setAttribute('radius', '1.2');
         ground.setAttribute('rotation', '-90 0 0');
@@ -97,16 +120,16 @@
         ground.setAttribute('material', 'color: #000000; opacity: 0.25; side: double');
         container.appendChild(ground);
 
-        // Floating congratulation sign
+        // Floating sign next to model
         const sign = document.createElement('a-entity');
         sign.setAttribute('geometry', {primitive: 'plane', height: 0.5, width: 1.5});
         sign.setAttribute('material', {color: '#6d3e92', opacity: 0.8, side: 'double'});
         sign.setAttribute('text', {value: obj.message, align:'center', color:'white', width:2});
-        sign.setAttribute('position', '1 1 0'); // to the side of model
+        sign.setAttribute('position', '1 1 0');
         sign.setAttribute('look-at', '#camera');
         container.appendChild(sign);
 
-        // Fade out sign after 5 seconds
+        // Fade out sign
         setTimeout(() => {
           container.removeChild(sign);
         }, 5000);
@@ -127,7 +150,7 @@
     scene.components.screenshot.capture('perspective', (dataUri) => {
       lastSelfieData = dataUri;
       document.getElementById('uploadPadlet').style.display = 'block';
-      window.open(dataUri); // open selfie in new tab
+      window.open(dataUri);
     });
   });
 
@@ -149,4 +172,3 @@
 
 </body>
 </html>
-
