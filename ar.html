@@ -15,30 +15,12 @@
       z-index: 1000;
       padding: 10px 20px;
       font-size: 18px;
-      border-radius: 8px;
-      cursor: pointer;
     }
     #takeSelfie { bottom: 20px; }
     #uploadPadlet { bottom: 70px; display:none; }
-    #backToMap { bottom: 120px; display:block; background: #444; color: white; }
-    #nearbyNotice {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 16px;
-      display: none;
-      z-index: 1000;
-    }
   </style>
 </head>
 <body>
-
-<div id="nearbyNotice"></div>
 
 <a-scene
   vr-mode-ui="enabled: false"
@@ -54,120 +36,111 @@
 
 <button id="takeSelfie">Take Selfie</button>
 <button id="uploadPadlet">Upload to Padlet</button>
-<button id="backToMap">Back to Map</button>
 
 <script>
-  const objects = [
-    {id:'law', lat: -26.688737, lon: 27.091276, model:"models/meet_mira.glb", message:"🎉 Well done! You found the Calvyn Fountain by Law."},
-    {id:'lovers', lat: -26.688676, lon: 27.092549, model:"models/meet_mira.glb", message:"💞 Well done! You found our Lover’s Lane."},
-    {id:'tree', lat: -26.688878, lon: 27.092565, model:"models/meet_mira.glb", message:"🌳 Well done! You found the Acacia Tree."}
-  ];
+const objects = [
+  {id:'law', lat: -26.688737, lon: 27.091276, model:"models/meet_mira.glb", message:"Well done! You found the Calvyn Fountain"},
+  {id:'lovers', lat: -26.688676, lon: 27.092549, model:"models/meet_mira.glb", message:"Well done! You found Lover's Lane"},
+  {id:'tree', lat: -26.688878, lon: 27.092565, model:"models/meet_mira.glb", message:"Well done! You found the Acacia Tree"}
+];
 
-  const SHOW_DISTANCE = 10; // meters
-  const collected = JSON.parse(localStorage.getItem('collected') || '{}');
-  let lastSelfieData = null;
-  let lastCollectedObject = null;
+const SHOW_DISTANCE = 10; // meters
+const collected = JSON.parse(localStorage.getItem('collected') || '{}');
+let lastSelfieData = null;
+let lastCollectedObject = null;
 
-  const nearbyNotice = document.getElementById('nearbyNotice');
+function getDistance(lat1, lon1, lat2, lon2) {
+  function toRad(x) { return x * Math.PI / 180; }
+  const R = 6371e3;
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
 
-  function getDistance(lat1, lon1, lat2, lon2) {
-    function toRad(x) { return x * Math.PI / 180; }
-    const R = 6371e3;
-    const φ1 = toRad(lat1);
-    const φ2 = toRad(lat2);
-    const Δφ = toRad(lat2 - lat1);
-    const Δλ = toRad(lon2 - lon1);
-    const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
+// Watch GPS
+navigator.geolocation.watchPosition(pos => {
+  const userLat = pos.coords.latitude;
+  const userLon = pos.coords.longitude;
+
+  objects.forEach(obj => {
+    const distance = getDistance(userLat, userLon, obj.lat, obj.lon);
+
+    if(distance <= SHOW_DISTANCE && !collected[obj.id]) {
+      // Mark as collected
+      collected[obj.id] = true;
+      localStorage.setItem('collected', JSON.stringify(collected));
+      alert(obj.message);
+
+      // Spawn model + ground + message sign
+      const scene = document.querySelector('a-scene');
+      const container = document.createElement('a-entity');
+      container.setAttribute('position', '0 0 -3'); // 3m in front of user
+
+      // 3D model
+      const model = document.createElement('a-entity');
+      model.setAttribute('gltf-model', obj.model);
+      model.setAttribute('scale', '1 1 1');
+      model.setAttribute('rotation', '0 180 0');
+      container.appendChild(model);
+
+      // Ground plane / shadow
+      const ground = document.createElement('a-circle');
+      ground.setAttribute('radius', '1.2');
+      ground.setAttribute('rotation', '-90 0 0');
+      ground.setAttribute('position', '0 0 0');
+      ground.setAttribute('material', 'color: #000000; opacity: 0.25; side: double');
+      container.appendChild(ground);
+
+      // Signboard with message
+      const sign = document.createElement('a-plane');
+      sign.setAttribute('position', '1.5 1 0'); // to the right of model
+      sign.setAttribute('rotation', '-10 0 0'); // slight tilt for readability
+      sign.setAttribute('width', '2');
+      sign.setAttribute('height', '0.8');
+      sign.setAttribute('material', 'color: #7546A2; opacity: 0.9');
+      const text = document.createElement('a-text');
+      text.setAttribute('value', obj.message);
+      text.setAttribute('align', 'center');
+      text.setAttribute('color', '#ffffff');
+      text.setAttribute('width', '2');
+      text.setAttribute('position', '0 0 0.01'); // slightly in front to prevent z-fighting
+      sign.appendChild(text);
+
+      container.appendChild(sign);
+      scene.appendChild(container);
+
+      lastCollectedObject = obj.id;
+    }
+  });
+}, err => console.error(err), { enableHighAccuracy: true });
+
+// Take selfie
+document.getElementById('takeSelfie').addEventListener('click', () => {
+  if(!lastCollectedObject) {
+    alert('Move closer to an object to take a selfie!');
+    return;
   }
-
-  navigator.geolocation.watchPosition(pos => {
-    const userLat = pos.coords.latitude;
-    const userLon = pos.coords.longitude;
-
-    objects.forEach(obj => {
-      const distance = getDistance(userLat, userLon, obj.lat, obj.lon);
-
-      // Show nearby notice if within 20m
-      if(distance <= 20 && !collected[obj.id]) {
-        nearbyNotice.style.display = 'block';
-        nearbyNotice.textContent = `You're near the ${obj.id}! Look around for your AR model.`;
-        setTimeout(()=> { nearbyNotice.style.display='none'; }, 4000);
-      }
-
-      if(distance <= SHOW_DISTANCE && !collected[obj.id]) {
-        collected[obj.id] = true;
-        localStorage.setItem('collected', JSON.stringify(collected));
-        alert(`You have collected: ${obj.id.toUpperCase()}!`);
-
-        const scene = document.querySelector('a-scene');
-        const container = document.createElement('a-entity');
-        container.setAttribute('position', '0 0 -3');
-
-        // 3D model
-        const model = document.createElement('a-entity');
-        model.setAttribute('gltf-model', obj.model);
-        model.setAttribute('scale', '1 1 1');
-        model.setAttribute('rotation', '0 180 0');
-        container.appendChild(model);
-
-        // Ground circle
-        const ground = document.createElement('a-circle');
-        ground.setAttribute('radius', '1.2');
-        ground.setAttribute('rotation', '-90 0 0');
-        ground.setAttribute('position', '0 0 0');
-        ground.setAttribute('material', 'color: #000000; opacity: 0.25; side: double');
-        container.appendChild(ground);
-
-        // Floating sign next to model
-        const sign = document.createElement('a-entity');
-        sign.setAttribute('geometry', {primitive: 'plane', height: 0.5, width: 1.5});
-        sign.setAttribute('material', {color: '#6d3e92', opacity: 0.8, side: 'double'});
-        sign.setAttribute('text', {value: obj.message, align:'center', color:'white', width:2});
-        sign.setAttribute('position', '1 1 0');
-        sign.setAttribute('look-at', '#camera');
-        container.appendChild(sign);
-
-        // Fade out sign
-        setTimeout(() => {
-          container.removeChild(sign);
-        }, 5000);
-
-        scene.appendChild(container);
-        lastCollectedObject = obj.id;
-      }
-    });
-  }, err => console.error(err), { enableHighAccuracy: true });
-
-  // Take selfie
-  document.getElementById('takeSelfie').addEventListener('click', () => {
-    if(!lastCollectedObject) {
-      alert('Move closer to an object to take a selfie!');
-      return;
-    }
-    const scene = document.querySelector('a-scene');
-    scene.components.screenshot.capture('perspective', (dataUri) => {
-      lastSelfieData = dataUri;
-      document.getElementById('uploadPadlet').style.display = 'block';
-      window.open(dataUri);
-    });
+  const scene = document.querySelector('a-scene');
+  scene.components.screenshot.capture('perspective', (dataUri) => {
+    lastSelfieData = dataUri;
+    document.getElementById('uploadPadlet').style.display = 'block';
+    window.open(dataUri);
   });
+});
 
-  // Upload to Padlet
-  document.getElementById('uploadPadlet').addEventListener('click', () => {
-    if(!lastSelfieData) {
-      alert('Take a selfie first!');
-      return;
-    }
-    window.open('https://padlet.com/nwu/desmond-tutu-school-of-medicine-kcvop1gmdyzyntoq', '_blank');
-    alert('Drag your selfie from the opened tab onto the Padlet wall.');
-  });
-
-  // Back to Map
-  document.getElementById('backToMap').addEventListener('click', () => {
-    window.location.href = 'index.html';
-  });
+// Upload to Padlet
+document.getElementById('uploadPadlet').addEventListener('click', () => {
+  if(!lastSelfieData) {
+    alert('Take a selfie first!');
+    return;
+  }
+  window.open('https://padlet.com/nwu/desmond-tutu-school-of-medicine-kcvop1gmdyzyntoq', '_blank');
+  alert('Drag your selfie from the opened tab onto the Padlet wall.');
+});
 </script>
 
 </body>
