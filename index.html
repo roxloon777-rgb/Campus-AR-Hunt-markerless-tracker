@@ -243,7 +243,8 @@ if ("geolocation" in navigator) {
 
       gpsHotspots.forEach(h => {
         const distance = Math.sqrt((latitude - h.lat)**2 + (longitude - h.lon)**2);
-        if (distance < 0.00005 && !collected[h.id]) {
+        // Increased threshold to ~20 meters
+        if (distance < 0.00018 && !collected[h.id]) {
           collected[h.id] = true;
           localStorage.setItem('collected', JSON.stringify(collected));
           document.getElementById(h.id).classList.add('collected');
@@ -262,4 +263,3 @@ document.getElementById('startButton').addEventListener('click', () => {
 
 </body>
 </html>
-
